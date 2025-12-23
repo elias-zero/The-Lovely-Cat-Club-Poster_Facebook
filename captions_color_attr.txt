@@ -1,0 +1,5 @@
+{intro} this {color_word} beauty is {attr_word}. {cta} {emoji}
+{color_adj} floof + {attr_word} = ❤️ {emoji}
+{intro} {color_adj} and {attr_desc}. {cta}
+Look at this {color_word} cuddle machine {emoji}
+{intro} — {color_adj}, {attr_word}, and irresistible. {emoji}
