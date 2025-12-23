@@ -1,75 +1,75 @@
 #!/usr/bin/env python3
-raise ValueError("No captions found")
-return lines
-except Exception as e:
-logging.warning(f"Could not load captions from {path}: {e}")
-return ["Cute cat alert! 🐾"]
+import os
+import sys
+import logging
+import requests
+from pathlib import Path
+from caption_generator import generate_caption
+from image_utils import download_and_make_square, cataas_random_square_url
 
+logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s: %(message)s')
 
+FB_TOKEN = os.getenv('FB_PAGE_ACCESS_TOKEN')
+PAGE_ID = os.getenv('FB_PAGE_ID')
+TEMP_IMAGE = '/tmp/cat_post.jpg'
 
+if not FB_TOKEN or not PAGE_ID:
+    logging.error('Missing FB_PAGE_ACCESS_TOKEN or FB_PAGE_ID environment variables.')
+    sys.exit(1)
 
-def pick_caption(captions):
-return random.choice(captions)
+# simple color detector (no external ML)
+from PIL import Image
+from io import BytesIO
 
+def detect_color_simple(image_url):
+    try:
+        r = requests.get(image_url, timeout=15)
+        r.raise_for_status()
+        img = Image.open(BytesIO(r.content)).convert('RGB')
+        img = img.resize((120,120))
+        pixels = list(img.getdata())
+        color_counts = {'orange':0,'white':0,'black':0,'gray':0,'brown':0,'other':0}
+        for rr,gg,bb in pixels:
+            if rr>150 and gg<130 and bb<120:
+                color_counts['orange'] += 1
+            elif rr>200 and gg>200 and bb>200:
+                color_counts['white'] += 1
+            elif rr<60 and gg<60 and bb<60:
+                color_counts['black'] += 1
+            elif abs(rr-gg)<15 and abs(gg-bb)<15 and 100<rr<200:
+                color_counts['gray'] += 1
+            elif rr>120 and gg>80 and bb<80:
+                color_counts['brown'] += 1
+            else:
+                color_counts['other'] += 1
+        dominant = max(color_counts, key=color_counts.get)
+        return dominant if color_counts[dominant] > (len(pixels)*0.05) else 'other'
+    except Exception as e:
+        logging.warning(f'Color detect failed: {e}')
+        return 'other'
 
-
-
-def get_cat_image_url():
-try:
-r = requests.get(CATAAS_JSON, timeout=15)
-r.raise_for_status()
-data = r.json()
-# data often contains 'url' or 'id'
-if isinstance(data, list) and data:
-data = data[0]
-if isinstance(data, dict):
-if 'url' in data:
-url = data['url']
-return url if url.startswith('http') else 'https://cataas.com' + url
-if 'id' in data:
-return f"https://cataas.com/cat/{data['id']}"
-# fallback to generic endpoint
-return 'https://cataas.com/cat'
-except Exception as e:
-logging.error(f"Failed to fetch cat image from CATAAS: {e}")
-raise
-
-
-
-
-def post_photo_to_facebook(image_url, message):
-endpoint = f"https://graph.facebook.com/{PAGE_ID}/photos"
-payload = {
-"url": image_url,
-"message": message,
-"access_token": FB_TOKEN
-}
-try:
-r = requests.post(endpoint, data=payload, timeout=30)
-r.raise_for_status()
-return r.json()
-except requests.HTTPError as e:
-logging.error(f"Facebook API error: {e} - {r.text if 'r' in locals() else ''}")
-raise
-
-
-
+def post_photo(image_path, message):
+    endpoint = f'https://graph.facebook.com/{PAGE_ID}/photos'
+    with open(image_path, 'rb') as f:
+        files = {'source': f}
+        data = {'message': message, 'access_token': FB_TOKEN}
+        r = requests.post(endpoint, files=files, data=data, timeout=60)
+        r.raise_for_status()
+        return r.json()
 
 def main():
-captions = load_captions()
-caption = pick_caption(captions)
-logging.info(f"Selected caption: {caption}")
+    # request slightly larger image then crop/resize to 1080
+    cataas_url = cataas_random_square_url(1200)
+    color_tag = detect_color_simple(cataas_url)
+    tags = [t for t in [color_tag] if t and t != 'other']
 
+    download_and_make_square(cataas_url, TEMP_IMAGE, size=1080)
 
-image_url = get_cat_image_url()
-logging.info(f"Fetched image URL: {image_url}")
+    caption = generate_caption(tags)
+    logging.info(f'Caption: {caption}')
 
-
-resp = post_photo_to_facebook(image_url, caption)
-logging.info(f"Posted to Facebook: {resp}")
-
-
-
+    resp = post_photo(TEMP_IMAGE, caption)
+    logging.info(f'Posted: {resp}')
 
 if __name__ == '__main__':
-main()
+    main()
