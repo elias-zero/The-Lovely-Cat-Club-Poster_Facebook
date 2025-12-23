@@ -1,0 +1,8 @@
+{intro} {attr_desc}. {cta} {emoji}
+Sweet dreams {emoji} — {cta}
+{descriptor} enjoying some {attr_word}. {emoji}
+Nap mode: {attr_word}. {cta}
+{intro} — {attr_desc} and loving it. {emoji}
+Caught mid-{attr_word}. {cta}
+This little one is all about {attr_word}. {emoji}
+Soft snooze, loud purrs. {emoji}
